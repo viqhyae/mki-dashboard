@@ -1,59 +1,70 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
 
-## About Laravel
+# Panduan Refactoring: Pemisahan Komponen dan Integrasi Laravel Inertia
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Dokumen ini berisi panduan untuk merapikan struktur kode dari file `app.docx` (atau `app.jsx`) yang sebelumnya menggabungkan seluruh logika autentikasi, manajemen brand, produk, kategori, hingga peta dalam satu file. 
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Tujuan utama dari refactoring ini adalah meningkatkan *maintainability* dan memudahkan pengelolaan kode ke depannya.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## 1. Struktur Folder Baru
+Silakan buat struktur folder berikut di dalam `resources/js/` untuk memisahkan tanggung jawab setiap file:
 
-## Learning Laravel
+* **`Components/`**: Untuk komponen UI kecil yang digunakan berulang kali (contoh: `Sidebar`, `Header`, `Button`).
+* **`Pages/`**: Untuk tampilan halaman utama aplikasi (contoh: `Dashboard`, `BrandManagement`).
+* **`Constants/`**: Untuk menyimpan data statis agar tidak memenuhi file logika utama.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## 2. Strategi Pemisahan Kode (Code Splitting)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Berikut adalah bagian-bagian yang harus dipindahkan dari file utama ke file komponen masing-masing:
 
-## Laravel Sponsors
+### A. Data Statis
+**Lokasi Baru:** `resources/js/Constants/index.js`  
+Cari dan pindahkan variabel berikut:
+* `const INITIAL_CATEGORY_DATA`
+* `const PRODUCT_SPEC_SCHEMA`
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### B. Komponen Sidebar
+**Lokasi Baru:** `resources/js/Components/Sidebar.jsx`  
+Pindahkan blok kode yang merender menu navigasi (ikon `LayoutDashboard`, `Building2`, `Package`, dll).  
+* **Ciri:** Bagian yang mengelola state `activeTab` dan `setActiveTab`.
 
-### Premium Partners
+### C. Komponen Modal
+**Lokasi Baru:** `resources/js/Components/Modals/`  
+Pindahkan kode `createPortal` yang menangani konfirmasi hapus atau tambah data.  
+* **Ciri:** Bagian yang menggunakan `confirmObj` dan ikon `AlertCircle`.
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+### D. Halaman Utama
+**Lokasi Baru:** `resources/js/Pages/Dashboard.jsx`  
+Gunakan file ini sebagai *entry point* atau "pengatur lalu lintas" yang memanggil `Sidebar` dan merender konten berdasarkan tab yang dipilih.
 
-## Contributing
+---
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## 3. Integrasi ke Laravel (Inertia.js)
 
-## Code of Conduct
+Untuk memastikan data tersimpan secara permanen di database (bukan sekadar `useState`), kita akan menggunakan form helper dari Inertia.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Contoh Implementasi `useForm` (AddBrandModal.jsx):
 
-## Security Vulnerabilities
+```javascript
+import { useForm } from '@inertiajs/react';
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+const { data, setData, post, processing } = useForm({
+    name: '',
+    brand_code: '',
+    owner_name: '',
+    description: '',
+});
 
-## License
+const submit = (e) => {
+    e.preventDefault();
+    // Mengirim data ke BrandController di Laravel
+    post(route('brands.store')); 
+};
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```
+
+## Langkah Selanjutnya
+
+1. **Refactor Sidebar**: Pisahkan komponen Sidebar terlebih dahulu dan pastikan muncul dengan benar di dashboard.
+2. **Manajemen Brand**: Buat file `BrandManagement.jsx` khusus untuk menampilkan tabel brand yang datanya ditarik langsung dari database melalui Controller Laravel.
+
